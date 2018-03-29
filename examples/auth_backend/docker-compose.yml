@@ -1,0 +1,37 @@
+version: '3'
+services:
+  ldap_auth:
+    build: ../..
+    ports:
+      - "8888:8888"
+    networks:
+      - frontend
+    volumes:
+      - .:/etc/nginx/conf.d
+
+    environment:
+      LOG_LEVEL: "debug"
+      LISTEN: ":8888"
+      LDAP_SERVER: "ldaps://ldap.jumpcloud.com"
+      LDAP_BASE: "o=${OID},dc=jumpcloud,dc=com"
+      LDAP_BIND_DN: "uid=${LDAP_BIND_USER},ou=Users,o=${OID},dc=jumpcloud,dc=com"
+      LDAP_BIND_PASSWORD: "${LDAP_BIND_PASSWORD}"
+      LDAP_USER_FILTER: "(uid=%s)"
+      LDAP_GROUP_FILTER: "(&(objectClass=groupOfNames)(member=uid=%s,ou=Users,o=${OID},dc=jumpcloud,dc=com))"
+      HEADERS_MAP: "X-LDAP-Mail:mail,X-LDAP-UID:uid,X-LDAP-CN:cn"
+  nginx:
+    image: nginx:1.13
+    ports:
+        - "8080:8080"
+        - "8000:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    links:
+      - ldap_auth
+    networks:
+      - frontend
+
+
+networks:
+  frontend:
+    driver: "bridge"

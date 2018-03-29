@@ -1,0 +1,27 @@
+language: go
+
+go:
+  - "1.10"
+
+services:
+  - docker
+
+install:
+  - env
+  - pwd
+  - echo $GOPATH
+  # Install Go dep tool, as per https://github.com/golang/dep#installation
+  #- curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh\
+  - go get -u golang.org/x/lint/golint
+
+script:
+  #- dep status
+  - golint
+  - go vet
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
+  - go build
+  # Let's verify that docker image is buildable
+  - docker build -t test .
+
+after_success:
+- bash <(curl -s https://codecov.io/bash)
