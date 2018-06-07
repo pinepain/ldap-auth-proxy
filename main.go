@@ -42,8 +42,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	defer p.Close()
-
 	log.Info(fmt.Sprintf("Listening on %s", c.Listen))
 	log.Fatal(http.ListenAndServe(c.Listen, p))
 }

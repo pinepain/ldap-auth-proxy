@@ -58,11 +58,6 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 	return p, nil
 }
 
-// Close - close underlying LDAP connection. The caller is responsible to invoke it.
-func (p *LDAPAuthProxy) Close() {
-	p.LDAPClient.Close()
-}
-
 type loggedResponse struct {
 	http.ResponseWriter
 	status int
@@ -150,48 +145,75 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 
 	s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
 	if len(s) != 2 {
-		log.Debug("Malformed auth header value")
+		traceDebug(w, "Malformed auth header value")
 		return http.StatusUnauthorized
 	}
 
 	b, err := base64.StdEncoding.DecodeString(s[1])
 	if err != nil {
-		log.Warningf("Failed to decode HTTP Authorisation header value: %s", err)
+		traceWarning(w, fmt.Sprintf("Failed to decode HTTP Authorisation header value: %s", err))
 		return http.StatusBadRequest
 	}
 
 	pair := strings.SplitN(string(b), ":", 2)
 	if len(pair) != 2 {
-		log.Warning("Bad HTTP Authorisation header value")
+		traceWarning(w, fmt.Sprintf("Bad HTTP Authorisation header value: %s", string(b)))
 		return http.StatusBadRequest
 	}
 
-	group := "*"
+	filterGroups := []string{"*"}
 
 	if p.GroupHeader != "" {
 		if r.Header.Get(p.GroupHeader) == "" {
-			log.Debug("No group header or empty group value when it required by configuration")
+			traceDebug(w, "No filterGroups header or empty filterGroups value when it required by configuration")
 			return http.StatusBadRequest
 		}
 
-		group = r.Header.Get(p.GroupHeader)
+		filterString := r.Header.Get(p.GroupHeader)
+		rawGroup := strings.Split(filterString, ",")
 
+		for _, g := range filterGroups {
+			g = strings.TrimSpace(g)
+
+			if "*" == g {
+				filterGroups = []string{"*"}
+				break
+			}
+
+			if len(g) > 1 {
+				filterGroups = append(rawGroup, g)
+			}
+		}
+
+		if len(filterGroups) < 1 {
+			traceWarning(w, fmt.Sprintf("Bad groups filter string: %s", filterString))
+			return http.StatusBadGateway
+		}
 	}
+
+	err = p.LDAPClient.Connect()
+
+	if err != nil {
+		traceWarning(w, err.Error())
+		return http.StatusBadGateway
+	}
+
+	defer p.LDAPClient.Close()
 
 	authenticated, attributes, err := p.LDAPClient.Authenticate(pair[0], pair[1])
 
 	if err != nil {
-		log.Warning(err)
-		// TODO: in fact we may experience LDAP-specific errors here which means we may need to log with error level and return 5XX status code
+		traceWarning(w, err.Error())
 		return http.StatusUnauthorized
 	}
 
 	if !authenticated {
-		log.Debug("Not authenticated by LDAP")
+		traceDebug(w, "Not authenticated by LDAP")
 		return http.StatusUnauthorized
 	}
 
-	if group == "*" {
+	// Special case
+	if len(filterGroups) > 0 && filterGroups[0] == "*" {
 		writeAttributes(p.HeadersMap, attributes, w)
 		return http.StatusAccepted
 	}
@@ -199,21 +221,22 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 	groupsOfUser, err := p.LDAPClient.GetGroupsOfUser(pair[0])
 
 	if err != nil {
-		log.Error(err)
+		traceError(w, err.Error())
 		return http.StatusUnauthorized
 	}
 
-	for _, g := range groupsOfUser {
-		if g == group {
-			writeAttributes(p.HeadersMap, attributes, w)
-			return http.StatusAccepted
+	for _, gUser := range groupsOfUser {
+		for _, gFilter := range filterGroups {
+			if gUser == gFilter {
+				writeAttributes(p.HeadersMap, attributes, w)
+				return http.StatusAccepted
+			}
 		}
 	}
 
-	log.Debug("Not authorized as per LDAP groups")
+	traceDebug(w, "Not authorized as per LDAP groups")
 	return http.StatusForbidden
 }
-
 
 // writeAttributes - map LDAP attributes back to HTTP headers and write them
 func writeAttributes(headers map[string]string, attributes map[string]string, w http.ResponseWriter) {
@@ -225,4 +248,31 @@ func writeAttributes(headers map[string]string, attributes map[string]string, w 
 
 		w.Header().Set(h, attributes[a])
 	}
+}
+
+func traceDebug(w http.ResponseWriter, h string) {
+	if log.GetLevel() < log.DebugLevel {
+		return
+	}
+
+	log.Debug(h)
+	w.Header().Add("X-LdapAuth-Trace", h)
+}
+
+func traceWarning(w http.ResponseWriter, h string) {
+	if log.GetLevel() < log.DebugLevel {
+		return
+	}
+
+	log.Warning(h)
+	w.Header().Add("X-LdapAuth-Trace", h)
+}
+
+func traceError(w http.ResponseWriter, h string) {
+	if log.GetLevel() < log.DebugLevel {
+		return
+	}
+
+	log.Warning(h)
+	w.Header().Add("X-LdapAuth-Trace", h)
 }
