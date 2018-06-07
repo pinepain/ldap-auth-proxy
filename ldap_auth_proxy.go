@@ -166,16 +166,32 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 		return http.StatusBadRequest
 	}
 
-	group := "*"
+	filterGroups := []string{"*"}
 
 	if p.GroupHeader != "" {
 		if r.Header.Get(p.GroupHeader) == "" {
-			log.Debug("No group header or empty group value when it required by configuration")
+			log.Debug("No filterGroups header or empty filterGroups value when it required by configuration")
 			return http.StatusBadRequest
 		}
 
-		group = r.Header.Get(p.GroupHeader)
+		rawGroup := strings.Split(r.Header.Get(p.GroupHeader), ",")
 
+		for _, g := range filterGroups {
+			g = strings.TrimSpace(g)
+
+			if "*" == g {
+				filterGroups = []string{"*"}
+				break
+			}
+
+			if len(g) > 1 {
+				filterGroups = append(rawGroup, g)
+			}
+		}
+
+		if len(filterGroups) < 1 {
+			return http.StatusBadGateway
+		}
 	}
 
 	authenticated, attributes, err := p.LDAPClient.Authenticate(pair[0], pair[1])
@@ -191,7 +207,8 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 		return http.StatusUnauthorized
 	}
 
-	if group == "*" {
+	// Special case
+	if len(filterGroups) > 0 && filterGroups[0] == "*" {
 		writeAttributes(p.HeadersMap, attributes, w)
 		return http.StatusAccepted
 	}
@@ -203,17 +220,18 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 		return http.StatusUnauthorized
 	}
 
-	for _, g := range groupsOfUser {
-		if g == group {
-			writeAttributes(p.HeadersMap, attributes, w)
-			return http.StatusAccepted
+	for _, gUser := range groupsOfUser {
+		for _, gFilter := range filterGroups {
+			if gUser == gFilter {
+				writeAttributes(p.HeadersMap, attributes, w)
+				return http.StatusAccepted
+			}
 		}
 	}
 
 	log.Debug("Not authorized as per LDAP groups")
 	return http.StatusForbidden
 }
-
 
 // writeAttributes - map LDAP attributes back to HTTP headers and write them
 func writeAttributes(headers map[string]string, attributes map[string]string, w http.ResponseWriter) {
