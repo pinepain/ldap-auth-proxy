@@ -58,11 +58,6 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 	return p, nil
 }
 
-// Close - close underlying LDAP connection. The caller is responsible to invoke it.
-func (p *LDAPAuthProxy) Close() {
-	p.LDAPClient.Close()
-}
-
 type loggedResponse struct {
 	http.ResponseWriter
 	status int
@@ -196,10 +191,18 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 		}
 	}
 
+	err = p.LDAPClient.Connect()
+
+	if err != nil {
+		traceWarning(w, err.Error())
+		return http.StatusBadGateway
+	}
+
+	defer p.LDAPClient.Close()
+
 	authenticated, attributes, err := p.LDAPClient.Authenticate(pair[0], pair[1])
 
 	if err != nil {
-		// TODO: in fact we may experience LDAP-specific errors here which means we may need to log with error level and return 5XX status code
 		traceWarning(w, err.Error())
 		return http.StatusUnauthorized
 	}
