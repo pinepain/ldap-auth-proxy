@@ -203,7 +203,7 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 	authenticated, attributes, err := p.LDAPClient.Authenticate(pair[0], pair[1])
 
 	if err != nil {
-		traceWarning(w, err.Error())
+		traceWarning(w, fmt.Sprintf("Failed to authenticate: %d", err))
 		return http.StatusUnauthorized
 	}
 
@@ -221,7 +221,7 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 	groupsOfUser, err := p.LDAPClient.GetGroupsOfUser(pair[0])
 
 	if err != nil {
-		traceError(w, err.Error())
+		traceError(w, fmt.Sprintf("Failed to get user groups: %s", err))
 		return http.StatusUnauthorized
 	}
 
