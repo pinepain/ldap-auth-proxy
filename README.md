@@ -34,6 +34,7 @@ Example `docker-compose` setup could be found in [examples/proxy](./examples/pro
     export LDAP_BIND_PASSWORD='<bind user password>'
     export LDAP_USER_FILTER='(uid=%s)'
     export LDAP_GROUP_FILTER='(&(objectClass=groupOfNames)(member=uid=%s,ou=Users,o=<oid>,dc=jumpcloud,dc=com))'
+    export GROUP_HEADER='X-Ldap-Group'
     export HEADERS_MAP='X-LDAP-Mail:mail,X-LDAP-UID:uid,X-LDAP-CN:cn,X-LDAP-DN:dn'
 
 where `<oid>` is your organisation id.

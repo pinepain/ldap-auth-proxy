@@ -170,20 +170,7 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 		}
 
 		filterString := r.Header.Get(p.GroupHeader)
-		rawGroup := strings.Split(filterString, ",")
-
-		for _, g := range filterGroups {
-			g = strings.TrimSpace(g)
-
-			if "*" == g {
-				filterGroups = []string{"*"}
-				break
-			}
-
-			if len(g) > 1 {
-				filterGroups = append(rawGroup, g)
-			}
-		}
+		filterGroups = extractFilterGroups(filterString)
 
 		if len(filterGroups) < 1 {
 			traceWarning(w, fmt.Sprintf("Bad groups filter string: %s", filterString))
@@ -275,4 +262,25 @@ func traceError(w http.ResponseWriter, h string) {
 
 	log.Warning(h)
 	w.Header().Add("X-LdapAuth-Trace", h)
+}
+
+func extractFilterGroups(filterString string) []string {
+	var filterGroups []string
+
+	rawGroup := strings.Split(filterString, ",")
+
+	for _, g := range rawGroup {
+		g = strings.TrimSpace(g)
+
+		if "*" == g {
+			// special case, we don't need any other filters with wildcard
+			return []string{"*"}
+		}
+
+		if len(g) > 1 {
+			filterGroups = append(filterGroups, g)
+		}
+	}
+
+	return filterGroups
 }
