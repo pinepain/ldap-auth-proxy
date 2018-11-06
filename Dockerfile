@@ -1,4 +1,4 @@
-FROM golang:1.10 AS build
+FROM golang:1.11 AS build
 
 # Cd into the api code directory
 WORKDIR /go/src/github.com/pinepain/ldap-auth-proxy

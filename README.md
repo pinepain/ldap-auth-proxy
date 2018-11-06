@@ -40,6 +40,16 @@ Example `docker-compose` setup could be found in [examples/proxy](./examples/pro
 where `<oid>` is your organisation id.
 
 
+## Notes
+
+A zero length password is always considered invalid since it is, according to the LDAP spec, a request for
+"unauthenticated authentication." Unauthenticated authentication should not be used for LDAP based authentication.
+See `section 5.1.2 of RFC-4513 <http://tools.ietf.org/html/rfc4513#section-5.1.2>`_ for a description of this behavior.
+
+Neither zero length username supported. Anonymous authentication should also not be used for LDAP based authentication.
+See `section 5.1.1 of RFC-4513 <http://tools.ietf.org/html/rfc4513#section-5.1.1>`_ for a description of that behavior.
+
+
 ## License
 
 [ldap-auth-proxy](https://github.com/pinepain/ldap-auth-proxy) is licensed under the [MIT license](http://opensource.org/licenses/MIT).
