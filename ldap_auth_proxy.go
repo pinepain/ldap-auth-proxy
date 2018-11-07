@@ -163,7 +163,7 @@ func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int
 
 	if pair[0] == "" || pair[1] == "" {
 		traceWarning(w, fmt.Sprintf("Only name/password authentication is supported (username and/or password are empty)"))
-		return http.StatusBadRequest
+		return http.StatusUnauthorized
 	}
 
 	filterGroups := []string{"*"}
