@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     && go test -cover
 
 
-FROM ubuntu:xenial AS ubuntu
+FROM ubuntu:bionic AS ubuntu
 RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates
 
 

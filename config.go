@@ -11,13 +11,15 @@ type Config struct {
 	LogFormat string `default:"txt" split_words:"true" desc:"Log format. Allowed values are 'txt' and 'json'"`
 	LogLevel  string `default:"info" split_words:"true"`
 
-	URLPathSignIn string `default:"/sign_in" split_words:"true"`
-	URLPathAuth   string `default:"/auth" split_words:"true"`
+	URLPathSignIn string `default:"/sign_in" envconfig:"URL_PATH_SIGN_IN"`
+	URLPathAuth   string `default:"/auth" envconfig:"URL_PATH_AUTH"`
 
 	MessageAuthRequired string `default:"Authorisation required" split_words:"true"`
 
 	Upstream       string `default:"" split_words:"true"`
 	PassHostHeader bool   `default:"true" split_words:"true"`
+
+	RedirectQueryAttribute string	`default:"" split_words:"true" desc:"Query attribute that holds URL to redirect to after successful sign in (sign in only mode)"`
 
 	LdapServer       string            `default:"" split_words:"true" desc:"LDAP server name URL"`
 	LdapBase         string            `default:"" split_words:"true"`

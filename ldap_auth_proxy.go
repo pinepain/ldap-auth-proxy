@@ -21,7 +21,7 @@ type LDAPAuthProxy struct {
 	LDAPClient     *ldap.LDAPClient
 	HeadersMap     map[string]string
 	GroupHeader    string
-	QueryAttribute string
+	RedirectQueryAttribute string
 
 	serveMux http.Handler
 }
@@ -51,6 +51,7 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 		LDAPClient:  l,
 		HeadersMap:  c.HeadersMap,
 		GroupHeader: c.GroupHeader,
+		RedirectQueryAttribute: c.RedirectQueryAttribute,
 
 		serveMux: mux,
 	}
@@ -112,7 +113,7 @@ func (p *LDAPAuthProxy) SignIn(w http.ResponseWriter, r *http.Request) {
 	if status != http.StatusAccepted {
 		http.Error(w, http.StatusText(status), status)
 	} else {
-		redirect := r.URL.Query().Get(p.QueryAttribute)
+		redirect := r.URL.Query().Get(p.RedirectQueryAttribute)
 		http.Redirect(w, r, r.Host+redirect, http.StatusFound)
 	}
 }
