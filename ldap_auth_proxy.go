@@ -73,6 +73,7 @@ func (l *loggedResponseWriter) WriteHeader(status int) {
 
 func (p *LDAPAuthProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	lw := &loggedResponseWriter{ResponseWriter: w}
+	log.Debugf(">>> %s %s", r.Method, r.URL)
 
 	switch r.URL.Path {
 	case p.AuthPath:
@@ -96,7 +97,7 @@ func (p *LDAPAuthProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: log username and whether status comes from proxy (e.g., add * to denote that it's a status from proxy
-	log.Debugf("%s %s %d", r.Method, r.URL, lw.status)
+	log.Debugf("<<< %s %s %d", r.Method, r.URL, lw.status)
 }
 
 // RobotsTxt - serve robots.txt file
