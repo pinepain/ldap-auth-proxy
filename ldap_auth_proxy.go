@@ -13,6 +13,7 @@ import (
 type LDAPAuthProxy struct {
 	RobotsPath string
 	PingPath   string
+	AlivePath  string
 	SignInPath string
 	AuthPath   string
 
@@ -44,6 +45,7 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 	p := &LDAPAuthProxy{
 		RobotsPath:    "/robots.txt",
 		PingPath:      "/ping",
+		AlivePath:     "/alive",
 		SignInPath:    c.URLPathSignIn,
 		AuthPath:      c.URLPathAuth,
 		SignInMessage: c.MessageAuthRequired,
@@ -59,31 +61,34 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 	return p, nil
 }
 
-type loggedResponse struct {
+type loggedResponseWriter struct {
 	http.ResponseWriter
 	status int
 }
 
-func (l *loggedResponse) WriteHeader(status int) {
+func (l *loggedResponseWriter) WriteHeader(status int) {
 	l.status = status
 	l.ResponseWriter.WriteHeader(status)
 }
 
 func (p *LDAPAuthProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	lw := &loggedResponse{ResponseWriter: w}
+	lw := &loggedResponseWriter{ResponseWriter: w}
 
 	switch r.URL.Path {
+	case p.AuthPath:
+		p.AuthenticateOnly(lw, r)
+		break
 	case p.RobotsPath:
-		p.RobotsTxt(lw)
+		p.RobotsTxt(lw, r)
 		break
 	case p.PingPath:
-		p.PingPage(lw)
+		p.PingPage(lw, r)
+		break
+	case p.AlivePath:
+		p.AlivePage(lw, r)
 		break
 	case p.SignInPath:
 		p.SignIn(lw, r)
-		break
-	case p.AuthPath:
-		p.AuthenticateOnly(lw, r)
 		break
 	default:
 		p.Proxy(lw, r)
@@ -95,15 +100,41 @@ func (p *LDAPAuthProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // RobotsTxt - serve robots.txt file
-func (p *LDAPAuthProxy) RobotsTxt(r http.ResponseWriter) {
-	r.WriteHeader(http.StatusOK)
-	fmt.Fprintf(r, "User-agent: *\nDisallow: /")
+func (p *LDAPAuthProxy) RobotsTxt(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "User-agent: *\nDisallow: /")
 }
 
-// PingPage - serve ping file
-func (p *LDAPAuthProxy) PingPage(r http.ResponseWriter) {
-	r.WriteHeader(http.StatusOK)
-	fmt.Fprintf(r, "OK")
+// PingPage - check that app is up and running
+func (p *LDAPAuthProxy) PingPage(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "OK")
+}
+
+// AlivePage - check that app and running and can serve requests properly
+func (p *LDAPAuthProxy) AlivePage(w http.ResponseWriter, r *http.Request) {
+	defer p.LDAPClient.Close()
+
+	err := p.LDAPClient.Connect()
+
+	if err != nil {
+		traceWarning(w, fmt.Sprintf("Failed to connect: %s", err.Error()))
+		w.WriteHeader(http.StatusBadGateway)
+		fmt.Fprintf(w, "ERROR")
+		return
+	}
+
+	err = p.LDAPClient.Conn.Bind(p.LDAPClient.BindDN, p.LDAPClient.BindPassword)
+
+	if err != nil {
+		traceWarning(w, fmt.Sprintf("Failed to bind: %s (%s, %s)", err.Error(), p.LDAPClient.BindDN, p.LDAPClient.BindPassword))
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "ERROR")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "OK")
 }
 
 // SignIn - serve sign in page
