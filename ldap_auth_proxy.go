@@ -108,10 +108,10 @@ func (p *LDAPAuthProxy) PingPage(r http.ResponseWriter) {
 
 // SignIn - serve sign in page
 func (p *LDAPAuthProxy) SignIn(w http.ResponseWriter, r *http.Request) {
-	status := p.Authenticate(w, r)
+	status := p.authenticate(w, r)
 
 	if status != http.StatusAccepted {
-		http.Error(w, http.StatusText(status), status)
+		sendError(w, status)
 	} else {
 		redirect := r.URL.Query().Get(p.RedirectQueryAttribute)
 		http.Redirect(w, r, r.Host+redirect, http.StatusFound)
@@ -120,9 +120,9 @@ func (p *LDAPAuthProxy) SignIn(w http.ResponseWriter, r *http.Request) {
 
 // AuthenticateOnly - serve auth-only endpoint
 func (p *LDAPAuthProxy) AuthenticateOnly(w http.ResponseWriter, r *http.Request) {
-	status := p.Authenticate(w, r)
+	status := p.authenticate(w, r)
 	if status != http.StatusAccepted {
-		http.Error(w, http.StatusText(status), status)
+		sendError(w, status)
 	} else {
 		w.WriteHeader(status)
 	}
@@ -130,20 +130,18 @@ func (p *LDAPAuthProxy) AuthenticateOnly(w http.ResponseWriter, r *http.Request)
 
 // Proxy - proxy incoming request to the upstream
 func (p *LDAPAuthProxy) Proxy(w http.ResponseWriter, r *http.Request) {
-	status := p.Authenticate(w, r)
+	status := p.authenticate(w, r)
 
 	if status != http.StatusAccepted {
-		http.Error(w, http.StatusText(status), status)
+		sendError(w, status)
 		return
 	}
 
 	p.serveMux.ServeHTTP(w, r)
 }
 
-// Authenticate - authenticate user from request
-func (p *LDAPAuthProxy) Authenticate(w http.ResponseWriter, r *http.Request) int {
-	w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, "Authorization required"))
-
+// authenticate - authenticate user from request
+func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int {
 	s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
 	if len(s) != 2 {
 		traceDebug(w, "Malformed auth header value")
@@ -289,4 +287,11 @@ func extractFilterGroups(filterString string) []string {
 	}
 
 	return filterGroups
+}
+
+func sendError(w http.ResponseWriter, status int) {
+	if http.StatusUnauthorized == status {
+		w.Header().Set("WWW-authenticate", fmt.Sprintf(`Basic realm="%s"`, "Authorization required"))
+	}
+	http.Error(w, http.StatusText(status), status)
 }
