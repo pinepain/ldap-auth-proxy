@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
+	"github.com/naoina/denco"
 )
 
 // LDAPAuthProxy - a struct that represent auth proxy internal configuration
@@ -16,8 +17,10 @@ type LDAPAuthProxy struct {
 	AlivePath  string
 	SignInPath string
 	AuthPath   string
+	SignInPathMask bool
+	AuthPathMask   bool
 
-	SignInMessage string
+	AuthMessage string
 
 	LDAPClient     *ldap.LDAPClient
 	HeadersMap     map[string]string
@@ -43,12 +46,14 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 	}
 
 	p := &LDAPAuthProxy{
-		RobotsPath:    "/robots.txt",
-		PingPath:      "/ping",
-		AlivePath:     "/alive",
-		SignInPath:    c.URLPathSignIn,
-		AuthPath:      c.URLPathAuth,
-		SignInMessage: c.MessageAuthRequired,
+		RobotsPath:     "/robots.txt",
+		PingPath:       "/ping",
+		AlivePath:      "/alive",
+		SignInPath:     c.URLPathSignIn,
+		AuthPath:       c.URLPathAuth,
+		AuthMessage:    c.MessageAuthRequired,
+		SignInPathMask: strings.Contains(c.URLPathSignIn, "*"),
+		AuthPathMask:   strings.Contains(c.URLPathAuth, "*"),
 
 		LDAPClient:  l,
 		HeadersMap:  c.HeadersMap,
@@ -75,25 +80,22 @@ func (p *LDAPAuthProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	lw := &loggedResponseWriter{ResponseWriter: w}
 	log.Debugf(">>> %s %s", r.Method, r.URL)
 
-	switch r.URL.Path {
-	case p.AuthPath:
-		p.AuthenticateOnly(lw, r)
-		break
-	case p.RobotsPath:
-		p.RobotsTxt(lw, r)
-		break
-	case p.PingPath:
-		p.PingPage(lw, r)
-		break
-	case p.AlivePath:
-		p.AlivePage(lw, r)
-		break
-	case p.SignInPath:
-		p.SignIn(lw, r)
-		break
-	default:
+	router := denco.New()
+	router.Build([]denco.Record{
+		{p.AuthPath, http.HandlerFunc(p.AuthenticateOnly)},
+		{p.SignInPath, http.HandlerFunc(p.SignIn)},
+		{p.RobotsPath, http.HandlerFunc(p.RobotsTxt)},
+		{p.PingPath, http.HandlerFunc(p.PingPage)},
+		{p.AlivePath, http.HandlerFunc(p.AlivePage)},
+	})
+
+	handler, _, found := router.Lookup(r.URL.Path)
+
+	if found {
+		//interface conversion: interface {} is func(http.ResponseWriter, *http.Request), not http.HandlerFunc
+		handler.(http.HandlerFunc)(lw, r)
+	} else {
 		p.Proxy(lw, r)
-		break
 	}
 
 	// TODO: log username and whether status comes from proxy (e.g., add * to denote that it's a status from proxy
@@ -143,7 +145,7 @@ func (p *LDAPAuthProxy) SignIn(w http.ResponseWriter, r *http.Request) {
 	status := p.authenticate(w, r)
 
 	if status != http.StatusAccepted {
-		sendError(w, status)
+		p.sendError(w, status)
 	} else {
 		redirect := r.URL.Query().Get(p.RedirectQueryAttribute)
 		http.Redirect(w, r, r.Host+redirect, http.StatusFound)
@@ -154,7 +156,7 @@ func (p *LDAPAuthProxy) SignIn(w http.ResponseWriter, r *http.Request) {
 func (p *LDAPAuthProxy) AuthenticateOnly(w http.ResponseWriter, r *http.Request) {
 	status := p.authenticate(w, r)
 	if status != http.StatusAccepted {
-		sendError(w, status)
+		p.sendError(w, status)
 	} else {
 		w.WriteHeader(status)
 	}
@@ -165,7 +167,7 @@ func (p *LDAPAuthProxy) Proxy(w http.ResponseWriter, r *http.Request) {
 	status := p.authenticate(w, r)
 
 	if status != http.StatusAccepted {
-		sendError(w, status)
+		p.sendError(w, status)
 		return
 	}
 
@@ -261,6 +263,14 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 	return http.StatusForbidden
 }
 
+func (p *LDAPAuthProxy) sendError(w http.ResponseWriter, status int) {
+	if http.StatusUnauthorized == status {
+		w.Header().Set("WWW-authenticate", fmt.Sprintf(`Basic realm="%s"`, p.AuthMessage))
+	}
+	http.Error(w, http.StatusText(status), status)
+}
+
+
 // writeAttributes - map LDAP attributes back to HTTP headers and write them
 func writeAttributes(headers map[string]string, attributes map[string]string, w http.ResponseWriter) {
 	log.Debugf("Headers: %+v, Attributes: %+v", headers, attributes)
@@ -321,9 +331,3 @@ func extractFilterGroups(filterString string) []string {
 	return filterGroups
 }
 
-func sendError(w http.ResponseWriter, status int) {
-	if http.StatusUnauthorized == status {
-		w.Header().Set("WWW-authenticate", fmt.Sprintf(`Basic realm="%s"`, "Authorization required"))
-	}
-	http.Error(w, http.StatusText(status), status)
-}
