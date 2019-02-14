@@ -10,12 +10,12 @@ install:
   - env
   - pwd
   - echo $GOPATH
-  # Install Go dep tool, as per https://github.com/golang/dep#installation
-  #- curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh\
   - go get -u golang.org/x/lint/golint
+  - go get -u github.com/golang/dep/cmd/dep
 
 script:
-  #- dep status
+  - dep status
+  - dep ensure
   - golint
   - go vet
   - go test -race -coverprofile=coverage.txt -covermode=atomic
