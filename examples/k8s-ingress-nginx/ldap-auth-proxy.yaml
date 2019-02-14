@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ldap-auth-proxy
+spec:
+  ports:
+    - port: 80
+      targetPort: 8888
+  selector:
+    app: ldap-auth-proxy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldap-auth-proxy
+spec:
+  selector:
+    matchLabels:
+      app: ldap-auth-proxy
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ldap-auth-proxy
+    spec:
+      containers:
+        - name: ldap-auth-proxy
+          image: pinepain/ldap-auth-proxy
+          ports:
+            - containerPort: 8888
+          env:
+            - name: LOG_LEVEL
+              value: "debug"
+            - name: LISTEN
+              value: ":8888"
+            - name: LDAP_SERVER
+              value: "ldaps://ldap.jumpcloud.com"
+            - name: LDAP_BASE
+              value: "o=<OID>,dc=jumpcloud,dc=com"
+            - name: LDAP_BIND_DN
+              value: "uid=<LDAP_BIND_USER>,ou=Users,o=<OID>,dc=jumpcloud,dc=com"
+            - name: LDAP_BIND_PASSWORD
+              value: "<LDAP_BIND_PASSWORD>"
+            - name: LDAP_USER_FILTER
+              value: "(uid=%s)"
+            - name: LDAP_GROUP_FILTER
+              value: "(&(objectClass=groupOfNames)(member=uid=%s,ou=Users,o=<OID>,dc=jumpcloud,dc=com))"
+            - name: HEADERS_MAP
+              value: "X-LDAP-Mail:mail,X-LDAP-UID:uid,X-LDAP-CN:cn"
+            - name: URL_PATH_AUTH
+              value: "/_external-auth-:orig-location-template"
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: auth-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: auth.yourdomain.com
+      http:
+        paths:
+          - backend:
+              serviceName: ldap-auth-proxy
+              servicePort: 80

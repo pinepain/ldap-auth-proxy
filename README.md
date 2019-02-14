@@ -21,7 +21,9 @@ LDAP auth proxy could be used in two modes: as an auth backend and as a proxy:
 
 ![auth backend](https://user-images.githubusercontent.com/2185793/38117476-e3a456dc-33bd-11e8-927d-ef68a9a863d7.png)
 
-Example `docker-compose` setup could be found in [examples/auth_backend](./examples/auth_backend).
+Examples:
+  - Kubernetes `ingress-nginx` setup could be found in [examples/k8s-ingress-nginx](./examples/k8s-ingress-nginx).
+  - `docker-compose` setup could be found in [examples/auth_backend](./examples/auth_backend).
 
 ### Proxy
 

@@ -6,11 +6,13 @@ WORKDIR /go/src/github.com/pinepain/ldap-auth-proxy
 # Copy the local package files to the container's workspace.
 ADD . /go/src/github.com/pinepain/ldap-auth-proxy
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN go get -u github.com/golang/dep/cmd/dep \
+    && dep ensure \
+    && CGO_ENABLED=0 GOOS=linux go build \
     && go test -cover
 
 
-FROM ubuntu:xenial AS ubuntu
+FROM ubuntu:bionic AS ubuntu
 RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates
 
 
