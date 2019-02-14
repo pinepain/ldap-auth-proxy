@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"github.com/naoina/denco"
+	"github.com/patrickmn/go-cache"
+	"time"
 )
 
 // LDAPAuthProxy - a struct that represent auth proxy internal configuration
@@ -27,8 +29,15 @@ type LDAPAuthProxy struct {
 	GroupHeader    string
 	RedirectQueryAttribute string
 
+	cache    *cache.Cache
 	serveMux http.Handler
 }
+
+type userStruct struct {
+	Status int
+	Attributes map[string]string
+}
+
 
 // NewLDAPAuthProxy - create new LDAP auth proxy
 func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
@@ -60,6 +69,7 @@ func NewLDAPAuthProxy(c *Config) (*LDAPAuthProxy, error) {
 		GroupHeader: c.GroupHeader,
 		RedirectQueryAttribute: c.RedirectQueryAttribute,
 
+		cache: cache.New(5*time.Minute, 10*time.Minute),
 		serveMux: mux,
 	}
 
@@ -182,7 +192,9 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 		return http.StatusUnauthorized
 	}
 
-	b, err := base64.StdEncoding.DecodeString(s[1])
+	authKey := s[1]
+
+	b, err := base64.StdEncoding.DecodeString(authKey)
 	if err != nil {
 		traceWarning(w, fmt.Sprintf("Failed to decode HTTP Authorisation header value: %s", err))
 		return http.StatusBadRequest
@@ -197,6 +209,19 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 	if pair[0] == "" || pair[1] == "" {
 		traceWarning(w, fmt.Sprintf("Only name/password authentication is supported (username and/or password are empty)"))
 		return http.StatusUnauthorized
+	}
+
+	item, found := p.cache.Get(authKey)
+
+	if found {
+		userStruct := item.(*userStruct)
+		traceDebug(w, "Serving from cache")
+
+		if http.StatusAccepted == userStruct.Status {
+			writeAttributes(p.HeadersMap, userStruct.Attributes, w)
+		}
+
+		return userStruct.Status
 	}
 
 	filterGroups := []string{"*"}
@@ -240,6 +265,7 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 	// Special case
 	if len(filterGroups) > 0 && filterGroups[0] == "*" {
 		writeAttributes(p.HeadersMap, attributes, w)
+		p.cache.Set(authKey, &userStruct{http.StatusAccepted, attributes}, cache.DefaultExpiration)
 		return http.StatusAccepted
 	}
 
@@ -254,6 +280,7 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 		for _, gFilter := range filterGroups {
 			if gUser == gFilter {
 				writeAttributes(p.HeadersMap, attributes, w)
+				p.cache.Set(authKey, &userStruct{http.StatusAccepted, attributes}, cache.DefaultExpiration)
 				return http.StatusAccepted
 			}
 		}

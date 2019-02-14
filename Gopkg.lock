@@ -42,6 +42,14 @@
   revision = "8475105a6b4c81953b3ea26afe2787a5f7b852e3"
 
 [[projects]]
+  digest = "1:808cdddf087fb64baeae67b8dfaee2069034d9704923a3cb8bd96a995421a625"
+  name = "github.com/patrickmn/go-cache"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
+  version = "v2.1.0"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -107,6 +115,7 @@
     "github.com/jtblin/go-ldap-client",
     "github.com/kelseyhightower/envconfig",
     "github.com/naoina/denco",
+    "github.com/patrickmn/go-cache",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
   ]
