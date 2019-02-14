@@ -92,11 +92,11 @@ func (p *LDAPAuthProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	router := denco.New()
 	router.Build([]denco.Record{
-		{p.AuthPath, http.HandlerFunc(p.AuthenticateOnly)},
-		{p.SignInPath, http.HandlerFunc(p.SignIn)},
-		{p.RobotsPath, http.HandlerFunc(p.RobotsTxt)},
-		{p.PingPath, http.HandlerFunc(p.PingPage)},
-		{p.AlivePath, http.HandlerFunc(p.AlivePage)},
+		{Key: p.AuthPath, Value: http.HandlerFunc(p.AuthenticateOnly)},
+		{Key: p.SignInPath, Value: http.HandlerFunc(p.SignIn)},
+		{Key: p.RobotsPath, Value: http.HandlerFunc(p.RobotsTxt)},
+		{Key: p.PingPath, Value: http.HandlerFunc(p.PingPage)},
+		{Key: p.AlivePath, Value: http.HandlerFunc(p.AlivePage)},
 	})
 
 	handler, _, found := router.Lookup(r.URL.Path)
