@@ -1,7 +1,6 @@
 # LDAP Auth proxy
 
 [![Build Status](https://api.travis-ci.org/pinepain/ldap-auth-proxy.svg?branch=master)](https://travis-ci.org/pinepain/ldap-auth-proxy)
-[![codecov](https://codecov.io/gh/pinepain/ldap-auth-proxy/branch/master/graph/badge.svg)](https://codecov.io/gh/pinepain/ldap-auth-proxy)
 [![Go Report Card](https://goreportcard.com/badge/github.com/pinepain/ldap-auth-proxy)](https://goreportcard.com/report/github.com/pinepain/ldap-auth-proxy)
 
 A simple drop-in HTTP proxy for transparent LDAP authorization which is also a HTTP auth backend.
