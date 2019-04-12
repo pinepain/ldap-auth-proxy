@@ -10,7 +10,7 @@ A simple drop-in HTTP proxy for transparent LDAP authorization which is also a H
 You can use `pinepain/ldap-auth-proxy` docker image (see available tags [here](https://hub.docker.com/r/pinepain/ldap-auth-proxy/tags/))
 or build binary by yourself, `Dockerfile` and `.travis.yml` list all necessary steps to build it.
 
-Usage examples could be foung in [examples](./examples) folder.
+Usage examples could be found in [examples](./examples) folder.
 
 ## Architecture
 
