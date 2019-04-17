@@ -181,6 +181,8 @@ func (p *LDAPAuthProxy) Proxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//Remove Authorization header when forwarding upstream
+	r.Header.Del("Authorization")
 	p.serveMux.ServeHTTP(w, r)
 }
 
