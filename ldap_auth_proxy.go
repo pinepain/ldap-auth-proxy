@@ -220,7 +220,7 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 		traceDebug(w, "Serving from cache")
 
 		if http.StatusAccepted == userStruct.Status {
-			writeAttributes(p.HeadersMap, userStruct.Attributes, w)
+			writeAttributes(p.HeadersMap, userStruct.Attributes, w, r)
 		}
 
 		return userStruct.Status
@@ -266,7 +266,7 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 
 	// Special case
 	if len(filterGroups) > 0 && filterGroups[0] == "*" {
-		writeAttributes(p.HeadersMap, attributes, w)
+		writeAttributes(p.HeadersMap, attributes, w, r)
 		p.cache.Set(authKey, &userStruct{http.StatusAccepted, attributes}, cache.DefaultExpiration)
 		return http.StatusAccepted
 	}
@@ -281,7 +281,7 @@ func (p *LDAPAuthProxy) authenticate(w http.ResponseWriter, r *http.Request) int
 	for _, gUser := range groupsOfUser {
 		for _, gFilter := range filterGroups {
 			if gUser == gFilter {
-				writeAttributes(p.HeadersMap, attributes, w)
+				writeAttributes(p.HeadersMap, attributes, w, r)
 				p.cache.Set(authKey, &userStruct{http.StatusAccepted, attributes}, cache.DefaultExpiration)
 				return http.StatusAccepted
 			}
@@ -301,13 +301,13 @@ func (p *LDAPAuthProxy) sendError(w http.ResponseWriter, status int) {
 
 
 // writeAttributes - map LDAP attributes back to HTTP headers and write them
-func writeAttributes(headers map[string]string, attributes map[string]string, w http.ResponseWriter) {
+func writeAttributes(headers map[string]string, attributes map[string]string, w http.ResponseWriter, r *http.Request ) {
 	log.Debugf("Headers: %+v, Attributes: %+v", headers, attributes)
 	for h, a := range headers {
 		if !strings.HasPrefix(h, "X-") && !strings.HasPrefix(h, "x-") {
 			h = "X-" + h
 		}
-
+    r.Header.Add(h, attributes[a])
 		w.Header().Set(h, attributes[a])
 	}
 }
@@ -359,4 +359,3 @@ func extractFilterGroups(filterString string) []string {
 
 	return filterGroups
 }
-
